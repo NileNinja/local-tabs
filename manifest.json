@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "Save Tabs",
+  "version": "1.0",
+  "description": "Save and organize browser tabs",
+  "permissions": [
+    "tabs",
+    "tabGroups",
+    "downloads",
+    "storage",
+    "fileSystem"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "48": "icons/icon48.svg"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  }
+}
