@@ -1,20 +1,24 @@
 document.addEventListener('DOMContentLoaded', async () => {
   await loadAllGroups();
   setupEventListeners();
+  setupMessageListener();
 });
+
+function setupMessageListener() {
+  // Add real-time updates through message listeners
+  chrome.runtime.onMessage.addListener((message) => {
+    if (message.type === 'groupsUpdated') {
+      // Reload only saved groups to avoid disrupting current window view
+      loadSavedGroups();
+    }
+  });
+}
 
 async function loadAllGroups() {
   await Promise.all([
     loadCurrentTabs(),
     loadSavedGroups()
   ]);
-  
-  // Add real-time updates through message listeners
-  chrome.runtime.onMessage.addListener((message) => {
-    if (message.type === 'groupsUpdated') {
-      loadAllGroups();
-    }
-  });
 }
 
 async function loadCurrentTabs() {
@@ -180,7 +184,8 @@ function createGroupElement(groupId, group, isCurrentWindow) {
   });
   buttonContainer.appendChild(actionButton);
   
-  if (!isCurrentWindow) {
+  // Only show delete button for saved groups (groups with savedAt timestamp)
+  if (!isCurrentWindow && group.savedAt) {
     const deleteButton = document.createElement('button');
     deleteButton.textContent = 'Delete Group';
     deleteButton.className = 'delete-button';
@@ -233,22 +238,26 @@ function createGroupElement(groupId, group, isCurrentWindow) {
     const tabActions = document.createElement('div');
     tabActions.className = 'tab-actions';
     
-    const removeBtn = document.createElement('button');
-    removeBtn.className = 'remove-btn';
-    removeBtn.title = 'Remove tab';
-    removeBtn.innerHTML = `
-      <svg class="trash-icon" viewBox="0 0 24 24">
-        <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
-      </svg>
-    `;
-    
-    if (isCurrentWindow) {
-      removeBtn.addEventListener('click', () => removeTabFromGroup(tab.id, groupId));
-    } else {
-      removeBtn.addEventListener('click', () => removeTabFromSaved(groupId, index));
+    // Only show remove button for saved groups
+    if ((isCurrentWindow && groupId !== 'ungrouped') || (!isCurrentWindow && group.savedAt)) {
+      const removeBtn = document.createElement('button');
+      removeBtn.className = 'remove-btn';
+      removeBtn.title = 'Remove tab';
+      removeBtn.innerHTML = `
+        <svg class="trash-icon" viewBox="0 0 24 24">
+          <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+        </svg>
+      `;
+      
+      if (isCurrentWindow) {
+        removeBtn.addEventListener('click', () => removeTabFromGroup(tab.id, groupId));
+      } else {
+        removeBtn.addEventListener('click', () => removeTabFromSaved(groupId, index));
+      }
+      
+      tabActions.appendChild(removeBtn);
     }
     
-    tabActions.appendChild(removeBtn);
     tabDiv.appendChild(tabActions);
     tabList.appendChild(tabDiv);
   });
@@ -269,47 +278,9 @@ function setupEventListeners() {
   // Settings panel
   const settingsPanel = document.getElementById('settingsPanel');
   const toggleSettings = document.getElementById('toggleSettings');
-  const chooseSaveLocation = document.getElementById('chooseSaveLocation');
-  const saveLocation = document.getElementById('saveLocation');
-
-  // Load saved directory
-  chrome.runtime.sendMessage({ action: 'getSaveDirectory' }, (response) => {
-    if (response.directory) {
-      saveLocation.value = response.directory;
-    }
-  });
 
   toggleSettings.addEventListener('click', () => {
     settingsPanel.classList.toggle('visible');
-  });
-
-  chooseSaveLocation.addEventListener('click', () => {
-    // Show file picker dialog
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.webkitdirectory = true;
-    input.directory = true;
-    
-    input.addEventListener('change', (e) => {
-      const files = e.target.files;
-      if (files.length > 0) {
-        // Get the directory path
-        const path = files[0].webkitRelativePath.split('/')[0];
-        const fullPath = `saved-tabs/${path}`;
-        
-        chrome.runtime.sendMessage({ 
-          action: 'setSaveDirectory', 
-          directory: fullPath
-        }, (response) => {
-          if (response.success) {
-            saveLocation.value = fullPath;
-            alert(`Save location set to: ${fullPath}\nYour tab groups will be saved in this directory.`);
-          }
-        });
-      }
-    });
-    
-    input.click();
   });
 }
 
@@ -405,7 +376,7 @@ async function saveGroup(groupId, group) {
     }
     
     if (response.path) {
-      alert(`Group saved successfully!\nSaved to: ${response.path}`);
+      alert(`Group saved successfully!\nSaved to: Downloads/${response.path}`);
     } else {
       alert('Group saved successfully!');
     }
@@ -540,9 +511,11 @@ async function importGroups(event) {
         }
       });
       
-      await chrome.storage.local.set({ 'savedGroups': groupData });
-      alert('Groups imported successfully!');
-      loadAllGroups();
+      const {groups: existing} = await chrome.storage.local.get('groups');
+      const merged = {...existing, ...groupData};
+      await chrome.storage.local.set({ 'savedGroups': merged });
+      chrome.runtime.sendMessage({ type: 'groupsUpdated' });
+      alert(`Successfully imported ${Object.keys(groupData).length} groups!`);
     } catch (error) {
       alert('Error importing groups: ' + error.message);
     }

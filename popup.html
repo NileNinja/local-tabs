@@ -138,19 +138,10 @@
     .settings-panel.visible {
       display: block;
     }
-    .save-location {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin-bottom: 10px;
-    }
-    .save-location input {
-      flex-grow: 1;
-      padding: 5px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      background: #fff;
-      cursor: default;
+    .info {
+      color: #666;
+      font-size: 13px;
+      line-height: 1.4;
     }
     .settings-button {
       background: none;
@@ -168,10 +159,8 @@
 </head>
 <body>
   <div class="settings-panel" id="settingsPanel">
-    <div class="save-location">
-      <label>Save Location:</label>
-      <input type="text" id="saveLocation" readonly placeholder="Choose a directory to save tab groups">
-      <button id="chooseSaveLocation">Choose Directory</button>
+    <div class="info">
+      Tab groups are saved in your Downloads/tab-groups folder
     </div>
   </div>
 

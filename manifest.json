@@ -7,11 +7,7 @@
     "tabs",
     "tabGroups",
     "downloads",
-    "storage",
-    "fileSystem"
-  ],
-  "host_permissions": [
-    "file://*"
+    "storage"
   ],
   "action": {
     "default_popup": "popup.html",
