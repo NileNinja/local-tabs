@@ -237,6 +237,52 @@ function setupEventListeners() {
     document.getElementById('importFile').click();
   });
   document.getElementById('importFile').addEventListener('change', importGroups);
+  
+  // Settings panel
+  const settingsPanel = document.getElementById('settingsPanel');
+  const toggleSettings = document.getElementById('toggleSettings');
+  const chooseSaveLocation = document.getElementById('chooseSaveLocation');
+  const saveLocation = document.getElementById('saveLocation');
+
+  // Load saved directory
+  chrome.runtime.sendMessage({ action: 'getSaveDirectory' }, (response) => {
+    if (response.directory) {
+      saveLocation.value = response.directory;
+    }
+  });
+
+  toggleSettings.addEventListener('click', () => {
+    settingsPanel.classList.toggle('visible');
+  });
+
+  chooseSaveLocation.addEventListener('click', () => {
+    // Show file picker dialog
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.webkitdirectory = true;
+    input.directory = true;
+    
+    input.addEventListener('change', (e) => {
+      const files = e.target.files;
+      if (files.length > 0) {
+        // Get the directory path
+        const path = files[0].webkitRelativePath.split('/')[0];
+        const fullPath = `saved-tabs/${path}`;
+        
+        chrome.runtime.sendMessage({ 
+          action: 'setSaveDirectory', 
+          directory: fullPath
+        }, (response) => {
+          if (response.success) {
+            saveLocation.value = fullPath;
+            alert(`Save location set to: ${fullPath}\nYour tab groups will be saved in this directory.`);
+          }
+        });
+      }
+    });
+    
+    input.click();
+  });
 }
 
 async function saveAllGroups() {
@@ -258,18 +304,29 @@ async function saveAllGroups() {
     // Save to chrome.storage.local
     await chrome.storage.local.set({ 'savedGroups': allGroups });
     
-    // Save to file
-    const timestamp = getTimestamp();
-    const response = await new Promise((resolve) => {
-      chrome.runtime.sendMessage({
-        action: 'saveFile',
-        filename: `tab_groups_${timestamp}.json`,
-        content: JSON.stringify(allGroups, null, 2)
-      }, resolve);
-    });
+    // Save each group to a separate file
+    for (const [groupId, group] of Object.entries(allGroups)) {
+      const groupData = {
+        title: group.title,
+        savedAt: group.savedAt,
+        tabs: group.tabs.map(tab => ({
+          title: tab.title,
+          url: tab.url,
+          favicon: tab.favicon
+        }))
+      };
 
-    if (response?.error) {
-      throw new Error(response.error);
+      const response = await new Promise((resolve) => {
+        chrome.runtime.sendMessage({
+          action: 'saveFile',
+          groupName: group.title || 'unnamed-group',
+          content: JSON.stringify(groupData, null, 2)
+        }, resolve);
+      });
+
+      if (response?.error) {
+        console.error(`Error saving group ${group.title}:`, response.error);
+      }
     }
     
     alert('Groups saved successfully!');
@@ -282,23 +339,36 @@ async function saveAllGroups() {
 
 async function saveGroup(groupId, group) {
   try {
-    const data = await chrome.storage.local.get('savedGroups');
+    const data = await chrome.storage.local.get(['savedGroups', 'saveDirectory']);
     const savedGroups = data.savedGroups || {};
     
     // Add timestamp to group
     group.savedAt = new Date().toISOString();
-    savedGroups[groupId] = group;
+    
+    // Generate a unique ID for the group if it's being saved for the first time
+    const savedGroupId = `${groupId}_${Date.now()}`;
+    savedGroups[savedGroupId] = group;
     
     // Save to chrome.storage.local
     await chrome.storage.local.set({ 'savedGroups': savedGroups });
     
+    // Prepare group data for file
+    const groupData = {
+      title: group.title,
+      savedAt: group.savedAt,
+      tabs: group.tabs.map(tab => ({
+        title: tab.title,
+        url: tab.url,
+        favicon: tab.favicon
+      }))
+    };
+    
     // Save to file
-    const timestamp = getTimestamp();
     const response = await new Promise((resolve) => {
       chrome.runtime.sendMessage({
         action: 'saveFile',
-        filename: `tab_group_${timestamp}.json`,
-        content: JSON.stringify({ [groupId]: group }, null, 2)
+        groupName: group.title || 'unnamed-group',
+        content: JSON.stringify(groupData, null, 2)
       }, resolve);
     });
 
@@ -306,7 +376,12 @@ async function saveGroup(groupId, group) {
       throw new Error(response.error);
     }
     
-    alert('Group saved successfully!');
+    if (response.path) {
+      alert(`Group saved successfully!\nSaved to: ${response.path}`);
+    } else {
+      alert('Group saved successfully!');
+    }
+    
     await loadAllGroups();
   } catch (error) {
     console.error('Error saving group:', error);
@@ -391,17 +466,29 @@ async function exportGroups() {
     const data = await chrome.storage.local.get('savedGroups');
     if (!data.savedGroups) return;
 
-    const timestamp = getTimestamp();
-    const response = await new Promise((resolve) => {
-      chrome.runtime.sendMessage({
-        action: 'saveFile',
-        filename: `tab_groups_${timestamp}.json`,
-        content: JSON.stringify(data.savedGroups, null, 2)
-      }, resolve);
-    });
+    // Export each group to a separate file
+    for (const [groupId, group] of Object.entries(data.savedGroups)) {
+      const groupData = {
+        title: group.title,
+        savedAt: group.savedAt,
+        tabs: group.tabs.map(tab => ({
+          title: tab.title,
+          url: tab.url,
+          favicon: tab.favicon
+        }))
+      };
 
-    if (response?.error) {
-      throw new Error(response.error);
+      const response = await new Promise((resolve) => {
+        chrome.runtime.sendMessage({
+          action: 'saveFile',
+          groupName: group.title || 'unnamed-group',
+          content: JSON.stringify(groupData, null, 2)
+        }, resolve);
+      });
+
+      if (response?.error) {
+        console.error(`Error exporting group ${group.title}:`, response.error);
+      }
     }
   } catch (error) {
     console.error('Error exporting groups:', error);
