@@ -19,7 +19,7 @@ A powerful Chrome extension that allows you to save and organize your browser ta
 1. Clone this repository or download the source code
 2. Open Chrome and navigate to `chrome://extensions/`
 3. Enable "Developer mode" in the top right corner
-4. Click "Load unpacked" and select the `save-tabs` directory
+4. Click "Load unpacked" and select the `local-tabs` directory
 
 ## Usage
 
@@ -60,7 +60,7 @@ A powerful Chrome extension that allows you to save and organize your browser ta
 ## File Structure
 
 ```
-save-tabs/
+local-tabs/
 ├── manifest.json        # Extension configuration
 ├── popup.html          # Main UI
 ├── popup.js           # UI logic and functionality

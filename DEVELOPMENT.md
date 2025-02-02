@@ -18,7 +18,7 @@ This document provides technical details and guidelines for developing the Save 
 3. **Initial Setup**
    ```bash
    git clone <repository-url>
-   cd save-tabs
+   cd local-tabs
    ```
 
 ## Architecture Overview
