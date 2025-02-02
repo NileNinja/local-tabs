@@ -5,10 +5,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 function setupMessageListener() {
-  // Add real-time updates through message listeners
   chrome.runtime.onMessage.addListener((message) => {
     if (message.type === 'groupsUpdated') {
-      // Reload only saved groups to avoid disrupting current window view
       loadSavedGroups();
     }
   });
@@ -29,18 +27,8 @@ async function loadCurrentTabs() {
   container.innerHTML = '';
   
   for (const window of windows) {
-    const windowDiv = document.createElement('div');
-    windowDiv.className = 'window-container';
-    
-    const windowTitle = document.createElement('div');
-    windowTitle.className = 'section-title';
-    windowTitle.textContent = window.title || `Window ${window.id}`;
-    windowDiv.appendChild(windowTitle);
-    
-    const groupedTabs = organizeTabsByGroup(window.tabs, tabGroups);
-    displayGroups(groupedTabs, windowDiv, true);
-    
-    container.appendChild(windowDiv);
+    const groupedTabs = organizeTabsByGroup(window.tabs, tabGroups, window);
+    displayGroups(groupedTabs, container, true);
   }
 }
 
@@ -50,7 +38,6 @@ async function loadSavedGroups() {
   
   const data = await chrome.storage.local.get('savedGroups');
   if (data.savedGroups) {
-    // Sort groups by timestamp, newest first
     const sortedGroups = Object.entries(data.savedGroups)
       .sort(([, a], [, b]) => {
         const timeA = new Date(a.savedAt || 0).getTime();
@@ -68,38 +55,55 @@ async function loadSavedGroups() {
 
 const PLACEHOLDER_ICON = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIGZpbGw9IiNFNEU0RTQiLz48L3N2Zz4=';
 
-function organizeTabsByGroup(tabs, groups) {
+function organizeTabsByGroup(tabs, groups, window) {
   const groupedTabs = {};
   
-  // Initialize groups
   groups.forEach(group => {
     groupedTabs[group.id] = {
-      title: group.title || 'Unnamed Group',
+      title: group.title || 'New Tab Group',
       tabs: []
     };
   });
   
-  // Add ungrouped tabs
-  groupedTabs['ungrouped'] = {
-    title: 'Ungrouped Tabs',
-    tabs: []
-  };
-  
-  // Organize tabs into groups
+  const ungroupedTabs = [];
   tabs.forEach(tab => {
-    const groupId = tab.groupId !== -1 ? tab.groupId : 'ungrouped';
-    if (!groupedTabs[groupId]) {
-      groupedTabs[groupId] = {
-        title: 'New Group',
-        tabs: []
-      };
+    if (tab.groupId !== -1) {
+      const groupId = tab.groupId;
+      if (!groupedTabs[groupId]) {
+        groupedTabs[groupId] = {
+          title: 'New Tab Group',
+          tabs: []
+        };
+      }
+      groupedTabs[groupId].tabs.push({
+        url: tab.url,
+        title: tab.title,
+        favicon: tab.favIconUrl || PLACEHOLDER_ICON,
+        id: tab.id
+      });
+    } else {
+      ungroupedTabs.push({
+        url: tab.url,
+        title: tab.title,
+        favicon: tab.favIconUrl || PLACEHOLDER_ICON,
+        id: tab.id
+      });
     }
-    groupedTabs[groupId].tabs.push({
-      url: tab.url,
-      title: tab.title,
-      favicon: tab.favIconUrl || PLACEHOLDER_ICON
-    });
   });
+
+  if (ungroupedTabs.length > 0) {
+    const firstTab = ungroupedTabs[0];
+    const remainingCount = ungroupedTabs.length - 1;
+    const groupTitle = remainingCount > 0 
+      ? `${firstTab.title} and ${remainingCount} more`
+      : firstTab.title;
+
+    groupedTabs[`ungrouped_${window.id}`] = {
+      title: groupTitle,
+      tabs: ungroupedTabs,
+      isUngrouped: true
+    };
+  }
   
   return groupedTabs;
 }
@@ -123,7 +127,7 @@ function createGroupElement(groupId, group, isCurrentWindow) {
   
   const title = document.createElement('input');
   title.type = 'text';
-  title.value = group.title || 'Unnamed Group';
+  title.value = group.title || 'New Tab Group';
   title.className = 'group-title';
   titleContainer.appendChild(title);
   
@@ -134,14 +138,24 @@ function createGroupElement(groupId, group, isCurrentWindow) {
     titleContainer.appendChild(timestamp);
   }
   
-  // Handle group renaming
   title.addEventListener('change', async () => {
-    const newTitle = title.value.trim() || 'Unnamed Group';
+    const newTitle = title.value.trim() || 'New Tab Group';
     title.value = newTitle;
     
     try {
       if (isCurrentWindow && groupId !== 'ungrouped') {
-        await chrome.tabGroups.update(parseInt(groupId), { title: newTitle });
+        const numericGroupId = parseInt(groupId);
+        if (!isNaN(numericGroupId)) {
+          try {
+            const groups = await chrome.tabGroups.query({});
+            const groupExists = groups.some(g => g.id === numericGroupId);
+            if (groupExists) {
+              await chrome.tabGroups.update(numericGroupId, { title: newTitle });
+            }
+          } catch (tabGroupError) {
+            console.error('Error updating tab group:', tabGroupError);
+          }
+        }
       }
       
       const data = await chrome.storage.local.get('savedGroups');
@@ -152,7 +166,7 @@ function createGroupElement(groupId, group, isCurrentWindow) {
       }
     } catch (error) {
       console.error('Error updating group name:', error);
-      title.value = group.title || 'Unnamed Group';
+      title.value = group.title || 'New Tab Group';
     }
   });
   
@@ -160,11 +174,13 @@ function createGroupElement(groupId, group, isCurrentWindow) {
   buttonContainer.className = 'button-container';
   
   const actionButton = document.createElement('button');
-  actionButton.textContent = isCurrentWindow ? 'Save Group' : 'Open Group';
   actionButton.className = 'action-button';
+  actionButton.title = isCurrentWindow ? 'Save Group' : 'Open Group';
+  actionButton.innerHTML = isCurrentWindow ? 
+    '<svg viewBox="0 0 24 24"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm2 16H5V5h11.17L19 7.83V19zm-7-7c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>' : 
+    '<svg viewBox="0 0 24 24"><path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>';
   actionButton.addEventListener('click', () => {
     if (isCurrentWindow) {
-      // Get selected tabs from checkboxes
       const selectedTabs = Array.from(groupDiv.querySelectorAll('.tab-item'))
         .filter(item => item.querySelector('.tab-checkbox').checked)
         .map(item => ({
@@ -184,11 +200,15 @@ function createGroupElement(groupId, group, isCurrentWindow) {
   });
   buttonContainer.appendChild(actionButton);
   
-  // Only show delete button for saved groups (groups with savedAt timestamp)
   if (!isCurrentWindow && group.savedAt) {
     const deleteButton = document.createElement('button');
-    deleteButton.textContent = 'Delete Group';
     deleteButton.className = 'delete-button';
+    deleteButton.title = 'Delete Group';
+    deleteButton.innerHTML = `
+      <svg viewBox="0 0 24 24">
+        <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+      </svg>
+    `;
     deleteButton.addEventListener('click', () => deleteGroup(groupId));
     buttonContainer.appendChild(deleteButton);
   }
@@ -238,8 +258,7 @@ function createGroupElement(groupId, group, isCurrentWindow) {
     const tabActions = document.createElement('div');
     tabActions.className = 'tab-actions';
     
-    // Only show remove button for saved groups
-    if ((isCurrentWindow && groupId !== 'ungrouped') || (!isCurrentWindow && group.savedAt)) {
+    if ((!isCurrentWindow && group.savedAt) || (isCurrentWindow && groupId !== 'ungrouped' && group.savedAt)) {
       const removeBtn = document.createElement('button');
       removeBtn.className = 'remove-btn';
       removeBtn.title = 'Remove tab';
@@ -267,120 +286,222 @@ function createGroupElement(groupId, group, isCurrentWindow) {
 }
 
 function setupEventListeners() {
-  document.getElementById('saveAll').addEventListener('click', saveAllGroups);
-  document.getElementById('refreshGroups').addEventListener('click', loadAllGroups);
+  document.getElementById('syncGroups').addEventListener('click', syncGroups);
   document.getElementById('exportGroups').addEventListener('click', exportGroups);
   document.getElementById('importGroups').addEventListener('click', () => {
     document.getElementById('importFile').click();
   });
   document.getElementById('importFile').addEventListener('change', importGroups);
   
-  // Settings panel
   const settingsPanel = document.getElementById('settingsPanel');
-  const toggleSettings = document.getElementById('toggleSettings');
+  const settingsToggle = document.getElementById('settingsToggle');
+  const selectedFolder = document.getElementById('selectedFolder');
+  const chooseFolderBtn = document.getElementById('chooseFolderBtn');
 
-  toggleSettings.addEventListener('click', () => {
+  settingsToggle.addEventListener('click', () => {
     settingsPanel.classList.toggle('visible');
+  });
+
+  chrome.storage.local.get('folderLocation', (data) => {
+    if (data.folderLocation) {
+      selectedFolder.textContent = data.folderLocation;
+    }
+  });
+
+  chooseFolderBtn.addEventListener('click', async () => {
+    try {
+      const dirHandle = await window.showDirectoryPicker();
+      const folderPath = dirHandle.name;
+      selectedFolder.textContent = folderPath;
+      await chrome.storage.local.set({ folderLocation: folderPath });
+      alert(`Sync folder set to: ${folderPath}\nFiles will be saved to: ${folderPath}/tab_groups/`);
+    } catch (error) {
+      if (error.name !== 'AbortError') {
+        console.error('Error selecting folder:', error);
+        alert('Failed to select folder: ' + error.message);
+      }
+    }
   });
 }
 
-async function saveAllGroups() {
+async function syncGroups() {
   try {
+    const { folderLocation } = await chrome.storage.local.get('folderLocation');
+    if (!folderLocation) {
+      alert('Please set a sync folder location in settings first');
+      return;
+    }
+
+    if (!confirm(`This will save all tab groups to: ${folderLocation}/tab_groups/\nContinue?`)) {
+      return;
+    }
+
     const windows = await chrome.windows.getAll({ populate: true });
     const groups = await chrome.tabGroups.query({});
     
-    let allGroups = {};
+    let currentGroups = {};
     for (const window of windows) {
-      const groupedTabs = organizeTabsByGroup(window.tabs, groups);
-      allGroups = { ...allGroups, ...groupedTabs };
+      const groupedTabs = organizeTabsByGroup(window.tabs, groups, window);
+      currentGroups = { ...currentGroups, ...groupedTabs };
     }
+
+    // Filter out ungrouped tabs
+    currentGroups = Object.entries(currentGroups).reduce((acc, [key, group]) => {
+      if (!key.startsWith('ungrouped_')) {
+        acc[key] = group;
+      }
+      return acc;
+    }, {});
     
-    // Add timestamp to all groups
-    Object.keys(allGroups).forEach(key => {
-      allGroups[key].savedAt = new Date().toISOString();
+    // Get existing saved groups
+    const { savedGroups } = await chrome.storage.local.get('savedGroups');
+    const existingGroups = savedGroups || {};
+    
+    // Update timestamps and prepare for sync
+    const timestamp = new Date().toISOString();
+    Object.keys(currentGroups).forEach(key => {
+      if (key !== 'ungrouped') {
+        currentGroups[key].savedAt = timestamp;
+      }
     });
     
-    // Save to chrome.storage.local
-    await chrome.storage.local.set({ 'savedGroups': allGroups });
+    // Merge current groups with existing, keeping the most recent version
+    const mergedGroups = { ...existingGroups };
+    for (const [groupId, group] of Object.entries(currentGroups)) {
+      if (groupId === 'ungrouped') continue;
+      
+      // Ensure the group has a valid ID and title
+      if (groupId && group.title) {
+        const sanitizedTitle = group.title
+          .trim()
+          .replace(/[^a-zA-Z0-9]/g, '_')  // Replace any non-alphanumeric char with underscore
+          .replace(/_+/g, '_')            // Collapse multiple underscores
+          .replace(/^_+|_+$/g, '')        // Remove leading/trailing underscores
+          .slice(0, 30);                  // Limit length
+
+        if (!sanitizedTitle) continue;     // Skip if title is invalid after sanitization
+        
+        const groupKey = `${sanitizedTitle}_${Date.now()}`;
+        mergedGroups[groupKey] = {
+          ...group,
+          title: sanitizedTitle
+        };
+      }
+    }
     
-    // Save each group to a separate file
-    for (const [groupId, group] of Object.entries(allGroups)) {
+    // Save to storage
+    await chrome.storage.local.set({ 'savedGroups': mergedGroups });
+    
+    // Sync with files
+    for (const [groupId, group] of Object.entries(mergedGroups)) {
       const groupData = {
         title: group.title,
         savedAt: group.savedAt,
         tabs: group.tabs.map(tab => ({
-          title: tab.title,
+          title: tab.title || 'Untitled',
           url: tab.url,
-          favicon: tab.favicon
+          favicon: tab.favicon || PLACEHOLDER_ICON
         }))
       };
 
       const response = await new Promise((resolve) => {
         chrome.runtime.sendMessage({
           action: 'saveFile',
-          groupName: group.title || 'unnamed-group',
-          content: JSON.stringify(groupData, null, 2)
+          groupName: group.title,
+          content: JSON.stringify(groupData, null, 2),
+          folderLocation: folderLocation
         }, resolve);
       });
 
       if (response?.error) {
-        console.error(`Error saving group ${group.title}:`, response.error);
+        console.error(`Error syncing group ${group.title}:`, response.error);
       }
     }
     
-    alert('Groups saved successfully!');
+    alert('Groups synced successfully!');
     await loadAllGroups();
   } catch (error) {
-    console.error('Error saving groups:', error);
-    alert(`Failed to save groups: ${error?.message || error || 'Unknown error'}`);
+    console.error('Error syncing groups:', error);
+    alert(`Failed to sync groups: ${error?.message || error || 'Unknown error'}`);
   }
 }
 
 async function saveGroup(groupId, group) {
   try {
-    const data = await chrome.storage.local.get(['savedGroups', 'saveDirectory']);
+    if (!group.title || !group.tabs || group.tabs.length === 0) {
+      throw new Error('Invalid group data');
+    }
+
+    const data = await chrome.storage.local.get('savedGroups');
     const savedGroups = data.savedGroups || {};
     
     // Add timestamp to group
     group.savedAt = new Date().toISOString();
     
-    // Generate a unique ID for the group if it's being saved for the first time
-    const savedGroupId = `${groupId}_${Date.now()}`;
-    savedGroups[savedGroupId] = group;
+    // Sanitize the title
+    const sanitizedTitle = group.title
+      .trim()
+      .replace(/[^a-zA-Z0-9]/g, '_')  // Replace any non-alphanumeric char with underscore
+      .replace(/_+/g, '_')            // Collapse multiple underscores
+      .replace(/^_+|_+$/g, '')        // Remove leading/trailing underscores
+      .slice(0, 30);                  // Limit length
+
+    if (!sanitizedTitle) {
+      throw new Error('Invalid group title after sanitization');
+    }
+    
+    const savedGroupId = `${sanitizedTitle}_${Date.now()}`;
+    
+    // Store the group with its sanitized title
+    const savedGroup = {
+      ...group,
+      title: sanitizedTitle
+    };
+    savedGroups[savedGroupId] = savedGroup;
     
     // Save to chrome.storage.local
     await chrome.storage.local.set({ 'savedGroups': savedGroups });
     
     // Prepare group data for file
     const groupData = {
-      title: group.title,
+      title: sanitizedTitle,
       savedAt: group.savedAt,
       tabs: group.tabs.map(tab => ({
-        title: tab.title,
+        title: tab.title || 'Untitled',
         url: tab.url,
-        favicon: tab.favicon
+        favicon: tab.favicon || PLACEHOLDER_ICON
       }))
     };
     
-    // Save to file
+    const { folderLocation } = await chrome.storage.local.get('folderLocation');
+    if (!folderLocation) {
+      alert('Please set a sync folder location in settings first');
+      return;
+    }
+
+    if (!confirm(`This will save the group to: ${folderLocation}/tab_groups/\nContinue?`)) {
+      return;
+    }
+
+    // Send message to background script
     const response = await new Promise((resolve) => {
       chrome.runtime.sendMessage({
         action: 'saveFile',
-        groupName: group.title || 'unnamed-group',
-        content: JSON.stringify(groupData, null, 2)
+        groupName: sanitizedTitle,
+        content: JSON.stringify(groupData, null, 2),
+        folderLocation: folderLocation
       }, resolve);
     });
+
+    if (!response) {
+      throw new Error('No response from background script');
+    }
 
     if (response?.error) {
       throw new Error(response.error);
     }
     
-    if (response.path) {
-      alert(`Group saved successfully!\nSaved to: Downloads/${response.path}`);
-    } else {
-      alert('Group saved successfully!');
-    }
-    
+    alert('Group saved successfully!');
     await loadAllGroups();
   } catch (error) {
     console.error('Error saving group:', error);
@@ -432,7 +553,6 @@ async function openSavedGroup(groupId, group) {
     title: group.title
   });
   
-  // Remove the empty tab created with the new window
   const [firstTab] = await chrome.tabs.query({ windowId: window.id });
   if (firstTab) {
     await chrome.tabs.remove(firstTab.id);
@@ -451,10 +571,7 @@ async function removeTabFromSaved(groupId, tabIndex) {
         delete savedGroups[groupId];
       }
       
-      // Save the updated groups
       await chrome.storage.local.set({ 'savedGroups': savedGroups });
-      
-      // Force a complete reload of all groups
       await loadAllGroups();
     }
   }
@@ -463,11 +580,18 @@ async function removeTabFromSaved(groupId, tabIndex) {
 async function exportGroups() {
   try {
     const data = await chrome.storage.local.get('savedGroups');
-    if (!data.savedGroups) return;
+    if (!data.savedGroups) {
+      alert('No groups to export');
+      return;
+    }
 
-    // Export each group to a separate file
+    const zip = new JSZip();
+    const timestamp = getTimestamp();
+    
+    const allGroupsData = {};
+    
     for (const [groupId, group] of Object.entries(data.savedGroups)) {
-      const groupData = {
+      allGroupsData[groupId] = {
         title: group.title,
         savedAt: group.savedAt,
         tabs: group.tabs.map(tab => ({
@@ -476,19 +600,21 @@ async function exportGroups() {
           favicon: tab.favicon
         }))
       };
-
-      const response = await new Promise((resolve) => {
-        chrome.runtime.sendMessage({
-          action: 'saveFile',
-          groupName: group.title || 'unnamed-group',
-          content: JSON.stringify(groupData, null, 2)
-        }, resolve);
-      });
-
-      if (response?.error) {
-        console.error(`Error exporting group ${group.title}:`, response.error);
-      }
     }
+    
+    zip.file('tab-groups.json', JSON.stringify(allGroupsData, null, 2));
+    
+    const zipBlob = await zip.generateAsync({ type: 'blob' });
+    const zipUrl = URL.createObjectURL(zipBlob);
+    
+    const downloadId = await chrome.downloads.download({
+      url: zipUrl,
+      filename: `tab-groups-${timestamp}.zip`,
+      saveAs: true
+    });
+    
+    URL.revokeObjectURL(zipUrl);
+    
   } catch (error) {
     console.error('Error exporting groups:', error);
     alert(`Failed to export groups: ${error?.message || error || 'Unknown error'}`);
@@ -502,25 +628,50 @@ async function importGroups(event) {
   const reader = new FileReader();
   reader.onload = async (e) => {
     try {
-      const groupData = JSON.parse(e.target.result);
+      let groupData;
       
-      // Add timestamps to imported groups if they don't have one
+      if (file.name.endsWith('.zip')) {
+        const zip = new JSZip();
+        const zipContent = await zip.loadAsync(e.target.result);
+        const jsonFile = zipContent.file('tab-groups.json');
+        
+        if (!jsonFile) {
+          throw new Error('Invalid ZIP file format: tab-groups.json not found');
+        }
+        
+        const jsonContent = await jsonFile.async('text');
+        groupData = JSON.parse(jsonContent);
+      } else {
+        groupData = JSON.parse(e.target.result);
+      }
+      
       Object.keys(groupData).forEach(key => {
         if (!groupData[key].savedAt) {
           groupData[key].savedAt = new Date().toISOString();
         }
       });
       
-      const {groups: existing} = await chrome.storage.local.get('groups');
-      const merged = {...existing, ...groupData};
+      const data = await chrome.storage.local.get('savedGroups');
+      const existing = data.savedGroups || {};
+      const merged = { ...existing, ...groupData };
       await chrome.storage.local.set({ 'savedGroups': merged });
+      
       chrome.runtime.sendMessage({ type: 'groupsUpdated' });
       alert(`Successfully imported ${Object.keys(groupData).length} groups!`);
+      
+      event.target.value = '';
+      
     } catch (error) {
+      console.error('Error importing groups:', error);
       alert('Error importing groups: ' + error.message);
     }
   };
-  reader.readAsText(file);
+  
+  if (file.name.endsWith('.zip')) {
+    reader.readAsArrayBuffer(file);
+  } else {
+    reader.readAsText(file);
+  }
 }
 
 function getTimestamp() {
