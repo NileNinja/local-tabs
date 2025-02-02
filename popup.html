@@ -3,6 +3,37 @@
 <head>
   <title>Tab Group Manager</title>
   <style>
+    /* Notification System */
+    .notification {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      color: white;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      z-index: 1000;
+      max-width: 80%;
+      text-align: center;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .notification.error {
+      background-color: var(--danger-color);
+    }
+
+    .notification.success {
+      background-color: var(--primary-color);
+    }
+
+    .notification.show {
+      opacity: 1;
+    }
+
     body {
       width: 500px;
       padding: 15px;
@@ -387,6 +418,7 @@
   </style>
 </head>
 <body>
+  <div id="notification" class="notification"></div>
   <div class="top-actions">
     <div class="action-group">
       <button id="syncGroups" class="sync-btn" title="Sync Groups">
@@ -432,7 +464,6 @@
   <div class="section-title">Saved Groups</div>
   <div id="saved-groups"></div>
   
-  <script src="lib/jszip.min.js"></script>
-  <script src="popup.js"></script>
+  <script type="module" src="js/popup.js"></script>
 </body>
 </html>
