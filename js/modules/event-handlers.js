@@ -43,6 +43,7 @@ function setupSettingsPanel() {
   const settingsPanel = document.getElementById('settingsPanel');
   const settingsToggle = document.getElementById('settingsToggle');
   const selectedSavePath = document.getElementById('selectedSavePath');
+  const actualPath = document.getElementById('actualPath');
   const chooseSavePathBtn = document.getElementById('chooseSavePathBtn');
   const resetSavePathBtn = document.getElementById('resetSavePathBtn');
 
@@ -54,6 +55,8 @@ function setupSettingsPanel() {
   chrome.storage.local.get('savePath', (data) => {
     if (data.savePath) {
       selectedSavePath.textContent = data.savePath;
+      const folderName = data.savePath.split('\\').pop();
+      actualPath.textContent = `Actual save location: Downloads/${folderName}`;
     }
   });
 
@@ -61,6 +64,7 @@ function setupSettingsPanel() {
   resetSavePathBtn.addEventListener('click', async () => {
     await chrome.storage.local.remove('savePath');
     selectedSavePath.textContent = 'Using default: Downloads/local-tabs';
+    actualPath.textContent = 'Actual save location: Downloads/local-tabs';
     showNotification('Save path reset to default', 'success');
   });
 
@@ -114,8 +118,10 @@ function setupSettingsPanel() {
 
       // Save the path
       selectedSavePath.textContent = folderPath;
+      const folderName = folderPath.split('\\').pop();
+      actualPath.textContent = `Actual save location: Downloads/${folderName}`;
       await chrome.storage.local.set({ savePath: folderPath });
-      showNotification(`Save path set to: ${folderPath}`, 'success');
+      showNotification(`Files will be saved in Downloads/${folderName}`, 'success');
     } catch (error) {
       if (error.name !== 'AbortError') {
         console.error('Error selecting folder:', error);
@@ -132,7 +138,8 @@ async function syncGroups() {
 
     // Normalize folder path for display
     const displayPath = targetPath.replace(/[/\\]+/g, '/');
-    if (!confirm(`This will save all tab groups to: ${displayPath}\nContinue?`)) {
+    const folderName = displayPath.split('/').pop();
+    if (!confirm(`This will save all tab groups to: Downloads/${folderName}\nContinue?`)) {
       return;
     }
 

@@ -453,9 +453,11 @@
       <h3>Settings</h3>
       <div class="folder-select">
         <h4>Save Location</h4>
-        <button id="chooseSavePathBtn" class="folder-button">Choose Save Path</button>
+        <p style="margin: 5px 0; font-size: 12px; color: var(--text-secondary);">Due to Chrome's security restrictions, files will be saved in a subfolder of your Downloads directory.</p>
+        <button id="chooseSavePathBtn" class="folder-button">Choose Folder Name</button>
         <div id="selectedSavePath" class="selected-folder">Using default: Downloads/local-tabs</div>
-        <button id="resetSavePathBtn" class="folder-button" style="background-color: var(--danger-color);">Reset to Default</button>
+        <div style="margin-top: 5px; font-size: 12px; color: var(--text-secondary);" id="actualPath">Actual save location: Downloads/local-tabs</div>
+        <button id="resetSavePathBtn" class="folder-button" style="background-color: var(--danger-color); margin-top: 10px;">Reset to Default</button>
       </div>
     </div>
   </div>
