@@ -24,12 +24,5 @@
   },
   "background": {
     "service_worker": "background.js"
-  },
-  "theme": {
-    "colors": {
-      "frame": "#FFFFFF",
-      "frame_inactive": "#FFFFFF",
-      "toolbar": "#FFFFFF"
-    }
   }
 }
