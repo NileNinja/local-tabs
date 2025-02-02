@@ -60,10 +60,7 @@ async function handleFileSave(message) {
       throw new Error('Missing required data: groupName or content');
     }
 
-    // Get user's preferred save path from storage
-    const { savePath } = await chrome.storage.local.get('savePath');
-
-    // Enhanced filename sanitization for Windows compatibility
+    // Sanitize filename for Windows compatibility
     let sanitizedName = message.groupName
       .trim()
       .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // Remove diacritics
@@ -110,48 +107,15 @@ async function handleFileSave(message) {
     const contentData = contentEncoder.encode(message.content);
     const dataUrl = `data:application/json;base64,${btoa(String.fromCharCode(...contentData))}`;
     
-    // Prepare the filename
-    let filename;
-    if (savePath) {
-      // First try the full path
-      filename = `${savePath.replace(/\\/g, '/')}/${sanitizedName}_${timestamp}.json`;
-      
-      // Try to save to the full path
-      try {
-        const fullPathId = await chrome.downloads.download({
-          url: dataUrl,
-          filename: filename,
-          saveAs: false,
-          conflictAction: 'uniquify'
-        });
-        
-        if (fullPathId) {
-          console.log('Successfully saved to full path:', filename);
-          downloadId = fullPathId;
-        }
-      } catch (error) {
-        // If full path fails, fall back to Downloads subfolder
-        console.log('Full path save failed, falling back to Downloads:', error);
-        const folderName = savePath.split(/[/\\]/).pop();
-        filename = `local-tabs/${sanitizedName}_${timestamp}.json`;
-        downloadId = await chrome.downloads.download({
-          url: dataUrl,
-          filename: filename,
-          saveAs: false,
-          conflictAction: 'uniquify'
-        });
-      }
-    } else {
-      filename = `local-tabs/${sanitizedName}_${timestamp}.json`;
-      downloadId = await chrome.downloads.download({
-        url: dataUrl,
-        filename: filename,
-        saveAs: false,
-        conflictAction: 'uniquify'
-      });
-    }
+    // Prepare and save the file
+    const filename = `${sanitizedName}_${timestamp}.json`;
+    const downloadId = await chrome.downloads.download({
+      url: dataUrl,
+      filename: filename,
+      saveAs: false,
+      conflictAction: 'uniquify'
+    });
     console.log('Saving file:', filename);
-    
 
     if (!downloadId) {
       throw new Error('Failed to initialize file download');
