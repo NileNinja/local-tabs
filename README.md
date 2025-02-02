@@ -5,14 +5,12 @@ A powerful Chrome extension that allows you to save and organize your browser ta
 ## Features
 
 - 🎯 Save individual tab groups or all groups at once
-- 📂 Choose custom save location for your tab groups
 - 🕒 Automatic timestamping of saved groups
 - 🖼️ Save favicons for easy visual recognition
 - 🔄 Import/Export functionality
 - 🗑️ Easy deletion of saved groups
 - 📝 Rename groups on the fly
 - 🔍 View full URLs and titles
-- ⚙️ Configurable save location
 
 ## Installation
 
@@ -40,19 +38,19 @@ A powerful Chrome extension that allows you to save and organize your browser ta
    - Use "Delete Group" to remove a saved group
    - Use "Open Group" to restore tabs in a new window
 
-3. **Setting Save Location**
-   - Click the ⚙️ (settings) button
-   - Click "Choose Directory" to select where to save your groups
-   - Selected location will be remembered for future saves
-
 ### Advanced Features
 
 1. **Import/Export**
-   - Use "Export" to save all groups to ZIP files
+   - Use "Export" to save all groups to ZIP files in your browser's default download location
    - Use "Import" to restore previously exported groups
    - Groups are exported with timestamps and all metadata preserved
 
-2. **Group Management**
+2. **Language Settings**
+   - Switch between English and Arabic interfaces
+   - Language preference is saved automatically
+   - Access language settings through the ⚙️ settings menu
+
+3. **Group Management**
    - Rename groups by clicking the group title
    - Remove individual tabs using the trash icon
    - Groups are automatically sorted by save time
@@ -134,12 +132,7 @@ Each group is saved as a JSON file with the following structure:
 
 ## Common Issues
 
-1. **Save Location Issues**
-   - Ensure you have write permissions for the selected directory
-   - Try selecting a different directory if saves fail
-   - Check Chrome's download settings
-
-2. **Missing Favicons**
+1. **Missing Favicons**
    - Some websites may not provide favicons
    - A placeholder icon will be used automatically
    - Cached favicons may become invalid
