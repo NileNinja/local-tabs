@@ -55,8 +55,7 @@ function setupSettingsPanel() {
   chrome.storage.local.get('savePath', (data) => {
     if (data.savePath) {
       selectedSavePath.textContent = data.savePath;
-      const folderName = data.savePath.split('\\').pop();
-      actualPath.textContent = `Actual save location: Downloads/${folderName}`;
+      actualPath.textContent = `Primary save location: ${data.savePath}`;
     }
   });
 
@@ -64,7 +63,7 @@ function setupSettingsPanel() {
   resetSavePathBtn.addEventListener('click', async () => {
     await chrome.storage.local.remove('savePath');
     selectedSavePath.textContent = 'Using default: Downloads/local-tabs';
-    actualPath.textContent = 'Actual save location: Downloads/local-tabs';
+    actualPath.textContent = 'Save location: Downloads/local-tabs';
     showNotification('Save path reset to default', 'success');
   });
 
@@ -118,10 +117,9 @@ function setupSettingsPanel() {
 
       // Save the path
       selectedSavePath.textContent = folderPath;
-      const folderName = folderPath.split('\\').pop();
-      actualPath.textContent = `Actual save location: Downloads/${folderName}`;
+      actualPath.textContent = `Primary save location: ${folderPath}`;
       await chrome.storage.local.set({ savePath: folderPath });
-      showNotification(`Files will be saved in Downloads/${folderName}`, 'success');
+      showNotification(`Will try to save files to: ${folderPath}\n(Falls back to Downloads/local-tabs if needed)`, 'success');
     } catch (error) {
       if (error.name !== 'AbortError') {
         console.error('Error selecting folder:', error);
@@ -138,8 +136,7 @@ async function syncGroups() {
 
     // Normalize folder path for display
     const displayPath = targetPath.replace(/[/\\]+/g, '/');
-    const folderName = displayPath.split('/').pop();
-    if (!confirm(`This will save all tab groups to: Downloads/${folderName}\nContinue?`)) {
+    if (!confirm(`Will try to save tab groups to: ${displayPath}\n(Falls back to Downloads/local-tabs if needed)\nContinue?`)) {
       return;
     }
 

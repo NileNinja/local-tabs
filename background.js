@@ -113,22 +113,45 @@ async function handleFileSave(message) {
     // Prepare the filename
     let filename;
     if (savePath) {
-      // Convert Windows backslashes to forward slashes and ensure no trailing slash
-      const normalizedPath = savePath.replace(/\\/g, '/').replace(/\/+$/, '');
-      // Extract the last folder name to use as a subdirectory in Downloads
-      const folderName = normalizedPath.split('/').pop();
-      filename = `${folderName}/${sanitizedName}_${timestamp}.json`;
+      // First try the full path
+      filename = `${savePath.replace(/\\/g, '/')}/${sanitizedName}_${timestamp}.json`;
+      
+      // Try to save to the full path
+      try {
+        const fullPathId = await chrome.downloads.download({
+          url: dataUrl,
+          filename: filename,
+          saveAs: false,
+          conflictAction: 'uniquify'
+        });
+        
+        if (fullPathId) {
+          console.log('Successfully saved to full path:', filename);
+          downloadId = fullPathId;
+        }
+      } catch (error) {
+        // If full path fails, fall back to Downloads subfolder
+        console.log('Full path save failed, falling back to Downloads:', error);
+        const folderName = savePath.split(/[/\\]/).pop();
+        filename = `local-tabs/${sanitizedName}_${timestamp}.json`;
+        downloadId = await chrome.downloads.download({
+          url: dataUrl,
+          filename: filename,
+          saveAs: false,
+          conflictAction: 'uniquify'
+        });
+      }
     } else {
       filename = `local-tabs/${sanitizedName}_${timestamp}.json`;
+      downloadId = await chrome.downloads.download({
+        url: dataUrl,
+        filename: filename,
+        saveAs: false,
+        conflictAction: 'uniquify'
+      });
     }
     console.log('Saving file:', filename);
     
-    const downloadId = await chrome.downloads.download({
-      url: dataUrl,
-      filename: filename,
-      saveAs: false,
-      conflictAction: 'uniquify'
-    });
 
     if (!downloadId) {
       throw new Error('Failed to initialize file download');

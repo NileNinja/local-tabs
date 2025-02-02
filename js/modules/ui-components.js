@@ -1,5 +1,5 @@
 import { showNotification } from './notification-system.js';
-import { saveGroup, deleteGroup, removeTabFromGroup, openSavedGroup, removeTabFromSaved } from './group-manager.js';
+import { saveGroup, deleteGroup, removeTabFromGroup, openSavedGroup, removeTabFromSaved, openSavedTab } from './group-manager.js';
 
 const PLACEHOLDER_ICON = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIGZpbGw9IiNFNEU0RTQiLz48L3N2Zz4=';
 
@@ -196,6 +196,19 @@ function createTabActions(tab, index, groupId, isCurrentWindow, group) {
   if ((!isCurrentWindow && group.savedAt) || (isCurrentWindow && groupId !== 'ungrouped' && group.savedAt)) {
     const tabActions = document.createElement('div');
     tabActions.className = 'tab-actions';
+
+    if (!isCurrentWindow) {
+      const openTabBtn = document.createElement('button');
+      openTabBtn.className = 'open-tab-btn';
+      openTabBtn.title = 'Open tab';
+      openTabBtn.innerHTML = `
+        <svg viewBox="0 0 24 24">
+          <path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/>
+        </svg>
+      `;
+      openTabBtn.addEventListener('click', () => openSavedTab(tab));
+      tabActions.appendChild(openTabBtn);
+    }
     
     const removeBtn = document.createElement('button');
     removeBtn.className = 'remove-btn';

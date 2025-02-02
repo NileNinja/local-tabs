@@ -148,6 +148,18 @@ export async function openSavedGroup(groupId, group) {
   }
 }
 
+export async function openSavedTab(tab) {
+  try {
+    await chrome.tabs.create({ url: tab.url });
+    showNotification('Tab opened successfully!', 'success');
+    return true;
+  } catch (error) {
+    console.error('Error opening tab:', error);
+    showNotification(`Failed to open tab: ${error.message}`);
+    return false;
+  }
+}
+
 export async function removeTabFromSaved(groupId, tabIndex) {
   if (!confirm('Remove this tab from the saved group?')) return false;
   

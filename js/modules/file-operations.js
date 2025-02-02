@@ -36,24 +36,37 @@ export async function exportGroups() {
       // Get user's preferred save path from storage
       const { savePath } = await chrome.storage.local.get('savePath');
       
-      // Prepare the filename
-      let filename;
+      let downloadId;
       if (savePath) {
-        // Convert Windows backslashes to forward slashes and ensure no trailing slash
-        const normalizedPath = savePath.replace(/\\/g, '/').replace(/\/+$/, '');
-        // Extract the last folder name to use as a subdirectory in Downloads
-        const folderName = normalizedPath.split('/').pop();
-        filename = `${folderName}/tab-groups-${timestamp}.zip`;
+        // First try the full path
+        const fullPath = `${savePath.replace(/\\/g, '/')}`;
+        try {
+          downloadId = await chrome.downloads.download({
+            url: dataUrl,
+            filename: `${fullPath}/tab-groups-${timestamp}.zip`,
+            saveAs: false,
+            conflictAction: 'uniquify'
+          });
+          console.log('Successfully saved to full path:', fullPath);
+        } catch (error) {
+          // If full path fails, fall back to Downloads subfolder
+          console.log('Full path save failed, falling back to Downloads:', error);
+          const folderName = savePath.split(/[/\\]/).pop();
+          downloadId = await chrome.downloads.download({
+            url: dataUrl,
+            filename: `local-tabs/tab-groups-${timestamp}.zip`,
+            saveAs: false,
+            conflictAction: 'uniquify'
+          });
+        }
       } else {
-        filename = `local-tabs/tab-groups-${timestamp}.zip`;
+        downloadId = await chrome.downloads.download({
+          url: dataUrl,
+          filename: `local-tabs/tab-groups-${timestamp}.zip`,
+          saveAs: false,
+          conflictAction: 'uniquify'
+        });
       }
-
-      const downloadId = await chrome.downloads.download({
-        url: dataUrl,
-        filename: filename,
-        saveAs: false,
-        conflictAction: 'uniquify'
-      });
       showNotification('Groups exported successfully!', 'success');
       
     } catch (blobError) {
