@@ -33,40 +33,13 @@ export async function exportGroups() {
       const zipBase64 = await zip.generateAsync({ type: 'base64' });
       const dataUrl = 'data:application/zip;base64,' + zipBase64;
       
-      // Get user's preferred save path from storage
-      const { savePath } = await chrome.storage.local.get('savePath');
-      
-      let downloadId;
-      if (savePath) {
-        // First try the full path
-        const fullPath = `${savePath.replace(/\\/g, '/')}`;
-        try {
-          downloadId = await chrome.downloads.download({
-            url: dataUrl,
-            filename: `${fullPath}/tab-groups-${timestamp}.zip`,
-            saveAs: false,
-            conflictAction: 'uniquify'
-          });
-          console.log('Successfully saved to full path:', fullPath);
-        } catch (error) {
-          // If full path fails, fall back to Downloads subfolder
-          console.log('Full path save failed, falling back to Downloads:', error);
-          const folderName = savePath.split(/[/\\]/).pop();
-          downloadId = await chrome.downloads.download({
-            url: dataUrl,
-            filename: `local-tabs/tab-groups-${timestamp}.zip`,
-            saveAs: false,
-            conflictAction: 'uniquify'
-          });
-        }
-      } else {
-        downloadId = await chrome.downloads.download({
-          url: dataUrl,
-          filename: `local-tabs/tab-groups-${timestamp}.zip`,
-          saveAs: false,
-          conflictAction: 'uniquify'
-        });
-      }
+      // Use browser's default download location
+      const downloadId = await chrome.downloads.download({
+        url: dataUrl,
+        filename: `tab-groups-${timestamp}.zip`,
+        saveAs: false,
+        conflictAction: 'uniquify'
+      });
       showNotification('groupsExported', 'success');
       
     } catch (blobError) {

@@ -42,105 +42,14 @@ export function setupMessageListener() {
 function setupSettingsPanel() {
   const settingsPanel = document.getElementById('settingsPanel');
   const settingsToggle = document.getElementById('settingsToggle');
-  const selectedSavePath = document.getElementById('selectedSavePath');
-  const actualPath = document.getElementById('actualPath');
-  const chooseSavePathBtn = document.getElementById('chooseSavePathBtn');
-  const resetSavePathBtn = document.getElementById('resetSavePathBtn');
 
   settingsToggle.addEventListener('click', () => {
     settingsPanel.classList.toggle('visible');
-  });
-
-  // Load saved path from storage
-  chrome.storage.local.get('savePath', (data) => {
-    if (data.savePath) {
-      selectedSavePath.textContent = data.savePath;
-      actualPath.textContent = `Primary save location: ${data.savePath}`;
-    }
-  });
-
-  // Reset save path to default
-  resetSavePathBtn.addEventListener('click', async () => {
-    await chrome.storage.local.remove('savePath');
-    selectedSavePath.textContent = 'Using default: Downloads/local-tabs';
-    actualPath.textContent = 'Save location: Downloads/local-tabs';
-    showNotification('Save path reset to default', 'success');
-  });
-
-  // Choose new save path
-  chooseSavePathBtn.addEventListener('click', async () => {
-    try {
-      // Create a test file to get the selected folder path
-      const testContent = 'test';
-      const testBlob = new Blob([testContent], { type: 'text/plain' });
-      const testUrl = URL.createObjectURL(testBlob);
-      
-      // First download to get user's preferred location
-      const downloadId = await chrome.downloads.download({
-        url: testUrl,
-        filename: 'select_folder.txt',
-        saveAs: true
-      });
-
-      // Wait for user to select location
-      const downloadItem = await new Promise((resolve, reject) => {
-        const listener = (delta) => {
-          if (delta.id === downloadId) {
-            if (delta.state?.current === 'complete') {
-              chrome.downloads.onChanged.removeListener(listener);
-              chrome.downloads.search({ id: downloadId }, ([item]) => {
-                resolve(item);
-              });
-            } else if (delta.error) {
-              chrome.downloads.onChanged.removeListener(listener);
-              reject(new Error(`Download failed: ${delta.error.current}`));
-            }
-          }
-        };
-        chrome.downloads.onChanged.addListener(listener);
-      });
-
-      if (!downloadItem?.filename) {
-        throw new Error('Failed to get selected folder path');
-      }
-
-      // Extract folder path and clean it up
-      const folderPath = downloadItem.filename
-        .substring(0, downloadItem.filename.lastIndexOf('\\'))
-        .replace(/\//g, '\\')
-        .replace(/\\+$/, ''); // Remove trailing slashes
-
-      // Clean up test file
-      await chrome.downloads.removeFile(downloadId);
-      await chrome.downloads.erase({ id: downloadId });
-      URL.revokeObjectURL(testUrl);
-
-      // Save the path
-      selectedSavePath.textContent = folderPath;
-      actualPath.textContent = `Primary save location: ${folderPath}`;
-      await chrome.storage.local.set({ savePath: folderPath });
-      showNotification(`Will try to save files to: ${folderPath}\n(Falls back to Downloads/local-tabs if needed)`, 'success');
-    } catch (error) {
-      if (error.name !== 'AbortError') {
-        console.error('Error selecting folder:', error);
-        showNotification('Failed to select folder: ' + error.message);
-      }
-    }
   });
 }
 
 async function syncGroups() {
   try {
-    const { savePath } = await chrome.storage.local.get('savePath');
-    const targetPath = savePath || 'local-tabs';
-
-    // Normalize folder path for display
-    const displayPath = targetPath.replace(/[/\\]+/g, '/');
-    if (!confirm(`Will try to save tab groups to: ${displayPath}\n(Falls back to Downloads/local-tabs if needed)\nContinue?`)) {
-      return;
-    }
-
-    console.log('Using save path:', targetPath);
 
     const windows = await chrome.windows.getAll({ populate: true });
     const groups = await chrome.tabGroups.query({});
@@ -203,56 +112,10 @@ async function syncGroups() {
     
     // Save to storage
     await chrome.storage.local.set({ 'savedGroups': mergedGroups });
-    
-    // Sync with files
-    let syncErrors = [];
-    for (const [groupId, group] of Object.entries(mergedGroups)) {
-      const groupData = {
-        title: group.title,
-        savedAt: group.savedAt,
-        tabs: group.tabs.map(tab => ({
-          title: tab.title || 'Untitled',
-          url: tab.url,
-          favicon: tab.favicon || PLACEHOLDER_ICON
-        }))
-      };
-
-      try {
-        const response = await new Promise((resolve) => {
-          console.log('Sending saveFile message for group:', group.title);
-          chrome.runtime.sendMessage({
-            action: 'saveFile',
-            groupName: group.title,
-            content: JSON.stringify(groupData, null, 2),
-            savePath: targetPath
-          }, resolve);
-        });
-
-        if (!response) {
-          throw new Error('No response received from background script');
-        }
-
-        console.log('Save response for group:', group.title, response);
-
-        if (response?.error) {
-          console.error(`Error syncing group ${group.title}:`, response.error);
-          syncErrors.push(`${group.title}: ${response.error}`);
-        }
-      } catch (error) {
-        console.error(`Error saving group ${group.title}:`, error);
-        syncErrors.push(`${group.title}: ${error.message || 'Unknown error'}`);
-      }
-    }
-    
-    if (syncErrors.length > 0) {
-      showNotification(`Sync completed with errors:\n${syncErrors.join('\n')}`);
-    } else {
-      showNotification('Groups synced successfully!', 'success');
-    }
-    
+    showNotification('Groups synced successfully!', 'success');
     await loadAllGroups();
   } catch (error) {
     console.error('Error syncing groups:', error);
-    showNotification(`Failed to sync groups: ${error?.message || error || 'Unknown error'}`);
+    showNotification('Failed to sync groups: ' + (error?.message || 'Unknown error'), 'error');
   }
 }
