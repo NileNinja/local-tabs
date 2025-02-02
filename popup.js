@@ -8,6 +8,13 @@ async function loadAllGroups() {
     loadCurrentTabs(),
     loadSavedGroups()
   ]);
+  
+  // Add real-time updates through message listeners
+  chrome.runtime.onMessage.addListener((message) => {
+    if (message.type === 'groupsUpdated') {
+      loadAllGroups();
+    }
+  });
 }
 
 async function loadCurrentTabs() {
@@ -23,7 +30,7 @@ async function loadCurrentTabs() {
     
     const windowTitle = document.createElement('div');
     windowTitle.className = 'section-title';
-    windowTitle.textContent = `Window ${window.id}`;
+    windowTitle.textContent = window.title || `Window ${window.id}`;
     windowDiv.appendChild(windowTitle);
     
     const groupedTabs = organizeTabsByGroup(window.tabs, tabGroups);
@@ -153,7 +160,20 @@ function createGroupElement(groupId, group, isCurrentWindow) {
   actionButton.className = 'action-button';
   actionButton.addEventListener('click', () => {
     if (isCurrentWindow) {
-      saveGroup(groupId, { ...group, title: title.value });
+      // Get selected tabs from checkboxes
+      const selectedTabs = Array.from(groupDiv.querySelectorAll('.tab-item'))
+        .filter(item => item.querySelector('.tab-checkbox').checked)
+        .map(item => ({
+          title: item.querySelector('.tab-title').textContent,
+          url: item.querySelector('.tab-url').textContent,
+          favicon: item.querySelector('.tab-favicon').src
+        }));
+      
+      saveGroup(groupId, { 
+        ...group, 
+        title: title.value,
+        tabs: selectedTabs
+      });
     } else {
       openSavedGroup(groupId, { ...group, title: title.value });
     }
@@ -178,6 +198,14 @@ function createGroupElement(groupId, group, isCurrentWindow) {
   group.tabs.forEach((tab, index) => {
     const tabDiv = document.createElement('div');
     tabDiv.className = 'tab-item';
+    
+    if (isCurrentWindow && !group?.savedAt) {
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.checked = true;
+      checkbox.className = 'tab-checkbox';
+      tabDiv.appendChild(checkbox);
+    }
     
     const favicon = document.createElement('img');
     favicon.className = 'tab-favicon';

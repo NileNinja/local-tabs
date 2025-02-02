@@ -79,6 +79,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             });
           });
         });
+      }).then(() => {
+        chrome.runtime.sendMessage({type: 'groupsUpdated'});
       });
     } catch (error) {
       sendResponse({ error: error.message });
