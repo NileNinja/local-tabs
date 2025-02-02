@@ -1,17 +1,5 @@
 // Handle storage operations and message broadcasting
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.action === 'verifyFolder') {
-    // Verify folder exists and is writable
-    verifyFolder(message.path)
-      .then(() => {
-        sendResponse({ success: true });
-      })
-      .catch(error => {
-        sendResponse({ error: error.message });
-      });
-    return true;
-  }
-  
   if (message.action === 'saveFile') {
     // Immediately acknowledge receipt of message
     sendResponse({ received: true });
@@ -54,78 +42,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 });
 
-// Verify folder exists and is writable, create if doesn't exist
-async function verifyFolder(path) {
-  try {
-    if (!path) {
-      throw new Error('No folder path provided');
-    }
-
-    // Validate and normalize the path for Windows
-    const normalizedPath = path
-      .trim()
-      .replace(/[/\\]+/g, '\\') // Convert all slashes to backslashes
-      .replace(/\\+$/, ''); // Remove trailing slashes
-
-    // Basic path validation
-    if (!/^[a-zA-Z]:\\/.test(normalizedPath)) {
-      throw new Error('Invalid folder path format');
-    }
-
-    console.log('Verifying folder:', normalizedPath);
-    
-    // Create a test file in the directory using a data URL with proper encoding
-    const testContent = 'test';
-    const testEncoder = new TextEncoder();
-    const testData = testEncoder.encode(testContent);
-    const testUrl = `data:text/plain;base64,${btoa(String.fromCharCode(...testData))}`;
-    
-    // Create a valid test filename
-    const timestamp = Date.now();
-    const testPath = `${normalizedPath}\\test_${timestamp}.txt`.replace(/[<>:"|?*]/g, '_');
-    console.log('Testing with path:', testPath);
-    
-    // Convert Windows absolute path to relative path for Chrome downloads
-    const relativePath = testPath.replace(/^([A-Za-z]):\\/, '');
-    console.log('Using relative path:', relativePath);
-    
-    const downloadId = await chrome.downloads.download({
-      url: testUrl,
-      filename: relativePath.replace(/\\/g, '/'), // Chrome downloads API expects forward slashes
-      conflictAction: 'uniquify',
-      saveAs: false
-    });
-
-    if (!downloadId) {
-      throw new Error('Download failed to initialize');
-    }
-
-    // Wait for download to complete
-    await new Promise((resolve, reject) => {
-      chrome.downloads.onChanged.addListener(function listener(delta) {
-        if (delta.id === downloadId) {
-          if (delta.state?.current === 'complete') {
-            chrome.downloads.onChanged.removeListener(listener);
-            resolve();
-          } else if (delta.error) {
-            chrome.downloads.onChanged.removeListener(listener);
-            reject(new Error(`Download failed: ${delta.error.current}`));
-          }
-        }
-      });
-    });
-
-    // Clean up test file
-    await chrome.downloads.removeFile(downloadId);
-    await chrome.downloads.erase({ id: downloadId });
-
-    return true;
-  } catch (error) {
-    console.error('Folder verification failed:', error);
-    throw new Error(`Unable to access folder: ${error.message}`);
-  }
-}
-
 // Enhanced storage listener for real-time updates
 chrome.storage.onChanged.addListener((changes) => {
   if (changes.savedGroups) {
@@ -143,6 +59,9 @@ async function handleFileSave(message) {
     if (!message.groupName || !message.content) {
       throw new Error('Missing required data: groupName or content');
     }
+
+    // Get user's preferred save path from storage
+    const { savePath } = await chrome.storage.local.get('savePath');
 
     // Enhanced filename sanitization for Windows compatibility
     let sanitizedName = message.groupName
@@ -186,87 +105,20 @@ async function handleFileSave(message) {
       .replace(/[T.Z]/g, '_')
       .slice(0, 15);
     
-    // Validate and normalize base path
-    const basePath = message.folderLocation || '';
-    if (!basePath) {
-      throw new Error('Save location not set. Please set a folder location in settings first.');
-    }
-
-    // Validate and normalize the path for Windows
-    const normalizedPath = basePath
-      .trim()
-      .replace(/[/\\]+/g, '\\') // Convert all slashes to backslashes
-      .replace(/\\+$/, ''); // Remove trailing slashes
-
-    // Basic path validation
-    if (!/^[a-zA-Z]:\\/.test(normalizedPath)) {
-      throw new Error('Invalid folder path format');
-    }
-
-    const groupsFolderName = 'tab_groups';
-    const groupsPath = `${normalizedPath}\\${groupsFolderName}`;
-
-    // Log paths for debugging
-    console.log('Base path:', basePath);
-    console.log('Normalized path:', normalizedPath);
-    console.log('Groups path:', groupsPath);
-
-    // First create a test file in the tab_groups directory to ensure it exists
-    const testContent = 'test';
-    const testEncoder = new TextEncoder();
-    const testData = testEncoder.encode(testContent);
-    const testUrl = `data:text/plain;base64,${btoa(String.fromCharCode(...testData))}`;
-    
-    const testPath = `${groupsPath}\\test_${Date.now()}.txt`.replace(/[<>:"|?*]/g, '_');
-    console.log('Creating test file to verify directory:', testPath);
-    
-    // Convert Windows absolute path to relative path for Chrome downloads
-    const relativeTestPath = testPath.replace(/^([A-Za-z]):\\/, '');
-    console.log('Using relative test path:', relativeTestPath);
-    
-    const testDownloadId = await chrome.downloads.download({
-      url: testUrl,
-      filename: relativeTestPath.replace(/\\/g, '/'),
-      saveAs: false,
-      conflictAction: 'uniquify'
-    });
-
-    // Wait for test file to complete
-    await new Promise((resolve, reject) => {
-      chrome.downloads.onChanged.addListener(function listener(delta) {
-        if (delta.id === testDownloadId) {
-          if (delta.state?.current === 'complete') {
-            chrome.downloads.onChanged.removeListener(listener);
-            resolve();
-          } else if (delta.error) {
-            chrome.downloads.onChanged.removeListener(listener);
-            reject(new Error(`Failed to create directory: ${delta.error.current}`));
-          }
-        }
-      });
-    });
-
-    // Clean up test file
-    await chrome.downloads.removeFile(testDownloadId);
-    await chrome.downloads.erase({ id: testDownloadId });
-
-    // Now save the actual file
-    const filename = `${groupsPath}\\${sanitizedName}_${timestamp}.json`.replace(/[<>:"|?*]/g, '_');
-    console.log('Saving file to:', filename);
-
     // Create data URL for the file with proper encoding
     const contentEncoder = new TextEncoder();
     const contentData = contentEncoder.encode(message.content);
     const dataUrl = `data:application/json;base64,${btoa(String.fromCharCode(...contentData))}`;
     
     // Save the file
-    // Convert Windows absolute path to relative path for Chrome downloads
-    const relativeFilename = filename.replace(/^([A-Za-z]):\\/, '');
-    console.log('Using relative filename:', relativeFilename);
+    const filename = savePath ? 
+      `${savePath}/${sanitizedName}_${timestamp}.json` : 
+      `local-tabs/${sanitizedName}_${timestamp}.json`;
+    console.log('Saving file:', filename);
     
     const downloadId = await chrome.downloads.download({
       url: dataUrl,
-      filename: relativeFilename.replace(/\\/g, '/'),
+      filename: filename,
       saveAs: false,
       conflictAction: 'uniquify'
     });

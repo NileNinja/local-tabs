@@ -42,20 +42,30 @@ export function setupMessageListener() {
 function setupSettingsPanel() {
   const settingsPanel = document.getElementById('settingsPanel');
   const settingsToggle = document.getElementById('settingsToggle');
-  const selectedFolder = document.getElementById('selectedFolder');
-  const chooseFolderBtn = document.getElementById('chooseFolderBtn');
+  const selectedSavePath = document.getElementById('selectedSavePath');
+  const chooseSavePathBtn = document.getElementById('chooseSavePathBtn');
+  const resetSavePathBtn = document.getElementById('resetSavePathBtn');
 
   settingsToggle.addEventListener('click', () => {
     settingsPanel.classList.toggle('visible');
   });
 
-  chrome.storage.local.get('folderLocation', (data) => {
-    if (data.folderLocation) {
-      selectedFolder.textContent = data.folderLocation;
+  // Load saved path from storage
+  chrome.storage.local.get('savePath', (data) => {
+    if (data.savePath) {
+      selectedSavePath.textContent = data.savePath;
     }
   });
 
-  chooseFolderBtn.addEventListener('click', async () => {
+  // Reset save path to default
+  resetSavePathBtn.addEventListener('click', async () => {
+    await chrome.storage.local.remove('savePath');
+    selectedSavePath.textContent = 'Using default: Downloads/local-tabs';
+    showNotification('Save path reset to default', 'success');
+  });
+
+  // Choose new save path
+  chooseSavePathBtn.addEventListener('click', async () => {
     try {
       // Create a test file to get the selected folder path
       const testContent = 'test';
@@ -102,22 +112,10 @@ function setupSettingsPanel() {
       await chrome.downloads.erase({ id: downloadId });
       URL.revokeObjectURL(testUrl);
 
-      // Verify we can write to this folder
-      const verifyResponse = await new Promise(resolve => {
-        chrome.runtime.sendMessage({
-          action: 'verifyFolder',
-          path: folderPath
-        }, resolve);
-      });
-
-      if (verifyResponse?.error) {
-        throw new Error(`Cannot write to selected folder: ${verifyResponse.error}`);
-      }
-
-      // Save folder location
-      selectedFolder.textContent = folderPath;
-      await chrome.storage.local.set({ folderLocation: folderPath });
-      showNotification(`Sync folder set to: ${folderPath}`, 'success');
+      // Save the path
+      selectedSavePath.textContent = folderPath;
+      await chrome.storage.local.set({ savePath: folderPath });
+      showNotification(`Save path set to: ${folderPath}`, 'success');
     } catch (error) {
       if (error.name !== 'AbortError') {
         console.error('Error selecting folder:', error);
@@ -129,19 +127,16 @@ function setupSettingsPanel() {
 
 async function syncGroups() {
   try {
-    const { folderLocation } = await chrome.storage.local.get('folderLocation');
-    if (!folderLocation) {
-      showNotification('Please set a sync folder location in settings first');
-      return;
-    }
+    const { savePath } = await chrome.storage.local.get('savePath');
+    const targetPath = savePath || 'local-tabs';
 
     // Normalize folder path for display
-    const displayPath = folderLocation.replace(/[/\\]+/g, '/');
-    if (!confirm(`This will save all tab groups to: ${displayPath}/tab_groups/\nContinue?`)) {
+    const displayPath = targetPath.replace(/[/\\]+/g, '/');
+    if (!confirm(`This will save all tab groups to: ${displayPath}\nContinue?`)) {
       return;
     }
 
-    console.log('Using folder location:', folderLocation);
+    console.log('Using save path:', targetPath);
 
     const windows = await chrome.windows.getAll({ populate: true });
     const groups = await chrome.tabGroups.query({});
@@ -225,7 +220,7 @@ async function syncGroups() {
             action: 'saveFile',
             groupName: group.title,
             content: JSON.stringify(groupData, null, 2),
-            folderLocation: folderLocation.trim() // Ensure no leading/trailing whitespace
+            savePath: targetPath
           }, resolve);
         });
 

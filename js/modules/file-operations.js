@@ -33,10 +33,18 @@ export async function exportGroups() {
       const zipBase64 = await zip.generateAsync({ type: 'base64' });
       const dataUrl = 'data:application/zip;base64,' + zipBase64;
       
+      // Get user's preferred save path from storage
+      const { savePath } = await chrome.storage.local.get('savePath');
+      const targetPath = savePath || 'local-tabs';
+      
+      // Create filename with path
+      const filename = `${targetPath}/tab-groups-${timestamp}.zip`;
+
       const downloadId = await chrome.downloads.download({
         url: dataUrl,
-        filename: `tab-groups-${timestamp}.zip`,
-        saveAs: true
+        filename: filename,
+        saveAs: false,
+        conflictAction: 'uniquify'
       });
       showNotification('Groups exported successfully!', 'success');
       
