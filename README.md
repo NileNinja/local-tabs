@@ -19,7 +19,7 @@ A powerful Chrome extension that allows you to save and organize your browser ta
 1. Clone this repository or download the source code
 2. Open Chrome and navigate to `chrome://extensions/`
 3. Enable "Developer mode" in the top right corner
-4. Click "Load unpacked" and select the `local-tabs` directory
+4. Click "Load unpacked" and select the `save-tabs` directory
 
 ## Usage
 
@@ -48,9 +48,9 @@ A powerful Chrome extension that allows you to save and organize your browser ta
 ### Advanced Features
 
 1. **Import/Export**
-   - Use "Export" to save all groups to JSON files
+   - Use "Export" to save all groups to ZIP files
    - Use "Import" to restore previously exported groups
-   - Each group is saved as a separate file with timestamp
+   - Groups are exported with timestamps and all metadata preserved
 
 2. **Group Management**
    - Rename groups by clicking the group title
@@ -60,13 +60,26 @@ A powerful Chrome extension that allows you to save and organize your browser ta
 ## File Structure
 
 ```
-local-tabs/
-├── manifest.json        # Extension configuration
-├── popup.html          # Main UI
-├── popup.js           # UI logic and functionality
-├── background.js      # Background processes
+save-tabs/
+├── manifest.json           # Extension configuration (Manifest V3)
+├── popup.html             # Main UI
+├── background.js          # Service worker for background processes
+├── js/
+│   ├── popup.js          # Main popup logic
+│   └── modules/          # Modular JavaScript components
+│       ├── event-handlers.js
+│       ├── file-operations.js
+│       ├── group-manager.js
+│       ├── notification-system.js
+│       ├── translations.js
+│       └── ui-components.js
+├── lib/
+│   └── jszip.min.js      # ZIP file handling library
+├── styles/
+│   └── popup.css         # UI styling
 └── icons/
-    └── icon48.svg     # Extension icon
+    ├── cat.svg           # UI icons
+    └── icon48.svg        # Extension icon
 ```
 
 ## Saved Data Format
@@ -95,6 +108,13 @@ Each group is saved as a JSON file with the following structure:
 - Chrome browser
 - Basic knowledge of JavaScript
 - Text editor (VS Code recommended)
+
+### Technical Details
+
+- Built using Manifest V3
+- Uses service workers for background processes
+- Implements JSZip for file compression
+- Modular JavaScript architecture for maintainability
 
 ### Local Development
 
@@ -134,7 +154,6 @@ Each group is saved as a JSON file with the following structure:
 Planned features and improvements:
 
 - [ ] Cloud sync support
-- [ ] Custom group colors
 - [ ] Search functionality
 - [ ] Keyboard shortcuts
 - [ ] Batch operations
