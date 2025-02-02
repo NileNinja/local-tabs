@@ -110,10 +110,17 @@ async function handleFileSave(message) {
     const contentData = contentEncoder.encode(message.content);
     const dataUrl = `data:application/json;base64,${btoa(String.fromCharCode(...contentData))}`;
     
-    // Save the file
-    const filename = savePath ? 
-      `${savePath}/${sanitizedName}_${timestamp}.json` : 
-      `local-tabs/${sanitizedName}_${timestamp}.json`;
+    // Prepare the filename
+    let filename;
+    if (savePath) {
+      // Convert Windows backslashes to forward slashes and ensure no trailing slash
+      const normalizedPath = savePath.replace(/\\/g, '/').replace(/\/+$/, '');
+      // Extract the last folder name to use as a subdirectory in Downloads
+      const folderName = normalizedPath.split('/').pop();
+      filename = `${folderName}/${sanitizedName}_${timestamp}.json`;
+    } else {
+      filename = `local-tabs/${sanitizedName}_${timestamp}.json`;
+    }
     console.log('Saving file:', filename);
     
     const downloadId = await chrome.downloads.download({

@@ -35,10 +35,18 @@ export async function exportGroups() {
       
       // Get user's preferred save path from storage
       const { savePath } = await chrome.storage.local.get('savePath');
-      const targetPath = savePath || 'local-tabs';
       
-      // Create filename with path
-      const filename = `${targetPath}/tab-groups-${timestamp}.zip`;
+      // Prepare the filename
+      let filename;
+      if (savePath) {
+        // Convert Windows backslashes to forward slashes and ensure no trailing slash
+        const normalizedPath = savePath.replace(/\\/g, '/').replace(/\/+$/, '');
+        // Extract the last folder name to use as a subdirectory in Downloads
+        const folderName = normalizedPath.split('/').pop();
+        filename = `${folderName}/tab-groups-${timestamp}.zip`;
+      } else {
+        filename = `local-tabs/tab-groups-${timestamp}.zip`;
+      }
 
       const downloadId = await chrome.downloads.download({
         url: dataUrl,
