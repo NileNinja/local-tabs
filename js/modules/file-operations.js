@@ -1,15 +1,15 @@
 import { showNotification } from './notification-system.js';
+import { t } from './translations.js';
 
 export async function exportGroups() {
   try {
     const data = await chrome.storage.local.get('savedGroups');
     if (!data.savedGroups) {
-      showNotification('No groups to export');
+      showNotification('noGroupsToExport');
       return;
     }
 
-    const JSZip = await import(chrome.runtime.getURL('lib/jszip.min.js'));
-    const zip = new JSZip.default();
+    const zip = new JSZip();
     const timestamp = getTimestamp();
     
     const allGroupsData = {};
@@ -67,23 +67,22 @@ export async function exportGroups() {
           conflictAction: 'uniquify'
         });
       }
-      showNotification('Groups exported successfully!', 'success');
+      showNotification('groupsExported', 'success');
       
     } catch (blobError) {
       console.error('Blob/URL handling error:', blobError);
-      throw new Error('Failed to process zip file: ' + (blobError.message || 'Unknown error'));
+      throw new Error(t('zipError', blobError.message || 'Unknown error'));
     }
     
   } catch (error) {
     console.error('Error exporting groups:', error);
-    showNotification(`Failed to export groups: ${error?.message || 'Unknown error'}`);
+    showNotification('exportError', 'error', error?.message || 'Unknown error');
   }
 }
 
 export async function importGroups(file) {
   if (!file) return;
   
-  const JSZip = await import(chrome.runtime.getURL('lib/jszip.min.js'));
   const reader = new FileReader();
   reader.onload = async (e) => {
     try {
@@ -91,25 +90,25 @@ export async function importGroups(file) {
       
       if (file.name.endsWith('.zip')) {
         try {
-          const zip = new JSZip.default();
+          const zip = new JSZip();
           const zipContent = await zip.loadAsync(e.target.result);
           const jsonFile = zipContent.file('tab-groups.json');
           
           if (!jsonFile) {
-            throw new Error('Invalid ZIP file format: tab-groups.json not found');
+            throw new Error(t('invalidZip'));
           }
           
           const jsonContent = await jsonFile.async('text');
           groupData = JSON.parse(jsonContent);
         } catch (zipError) {
           console.error('ZIP processing error:', zipError);
-          throw new Error('Failed to process ZIP file: ' + (zipError.message || 'Unknown error'));
+          throw new Error(t('zipError', zipError.message || 'Unknown error'));
         }
       } else {
         try {
           groupData = JSON.parse(e.target.result);
         } catch (jsonError) {
-          throw new Error('Invalid JSON format: ' + (jsonError.message || 'Unknown error'));
+          throw new Error(t('jsonError', jsonError.message || 'Unknown error'));
         }
       }
       
@@ -125,12 +124,12 @@ export async function importGroups(file) {
       await chrome.storage.local.set({ 'savedGroups': merged });
       
       chrome.runtime.sendMessage({ type: 'groupsUpdated' });
-      showNotification(`Successfully imported ${Object.keys(groupData).length} groups!`, 'success');
+      showNotification('groupsImported', 'success', Object.keys(groupData).length);
       
       return true;
     } catch (error) {
       console.error('Error importing groups:', error);
-      showNotification('Error importing groups: ' + error.message);
+      showNotification('importError', 'error', error.message);
       return false;
     }
   };

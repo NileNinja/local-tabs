@@ -1,5 +1,8 @@
 // Notification system for displaying user feedback
-export function showNotification(message, type = 'error') {
+import { t } from './translations.js';
+
+export function showNotification(messageKey, type = 'error', ...args) {
+  const message = typeof messageKey === 'string' ? t(messageKey, ...args) : messageKey;
   const notification = document.getElementById('notification');
   notification.textContent = message;
   notification.className = `notification ${type}`;

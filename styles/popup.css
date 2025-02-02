@@ -1,3 +1,58 @@
+/* RTL Support */
+[dir="rtl"] .action-group {
+  margin-right: 0;
+  margin-left: 15px;
+}
+
+[dir="rtl"] .settings-path {
+  border-left: none;
+  border-right: 6px var(--secondary-color) solid;
+}
+
+[dir="rtl"] .button-container {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .tab-actions {
+  flex-direction: row-reverse;
+}
+
+/* Language Select */
+.settings-section {
+  margin-bottom: 20px;
+  gap: 8px;
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-section h4 {
+  margin: 0;
+  font-size: 16px;
+  color: var(--text-primary);
+}
+
+.settings-select {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 14px;
+  color: var(--text-primary);
+  background-color: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.settings-select:hover {
+  border-color: #999;
+}
+
+.settings-select:focus {
+  border-color: var(--primary-color);
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.1);
+}
+
 /* Variables */
 :root {
   --primary-color: rgb(76, 175, 80);
@@ -39,9 +94,13 @@
 body {
   width: 500px;
   padding: 15px;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  font-family: 'Noto Sans', 'Noto Naskh Arabic', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
   color: var(--text-primary);
   background: #fff;
+}
+
+[dir="rtl"] {
+  font-family: 'Noto Naskh Arabic', 'Noto Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
 }
 
 /* Notification System */
@@ -156,13 +215,18 @@ body {
 .icon-button {
   display: flex;
   align-items: center;
-  width: 40px;
+  justify-content: center;
+  gap: 8px;
   height: 40px;
+  padding: 0 16px;
   background: none;
   border: 1px solid var(--border-color);
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.2s ease;
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 14px;
 }
 
 .icon-button:hover {
@@ -172,9 +236,9 @@ body {
 }
 
 .settings-icon {
-  width: 24px;
-  height: 24px;
-  fill: var(--text-primary);
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
 }
 
 /* Settings Panel */

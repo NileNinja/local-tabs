@@ -2,6 +2,7 @@ import { showNotification } from './modules/notification-system.js';
 import { organizeTabsByGroup } from './modules/group-manager.js';
 import { displayGroups } from './modules/ui-components.js';
 import { setupEventListeners, setupMessageListener } from './modules/event-handlers.js';
+import { setLanguage, getCurrentLanguage, t, initializeLanguage } from './modules/translations.js';
 
 async function loadAllGroups() {
   await Promise.all([
@@ -30,7 +31,7 @@ async function loadCurrentTabs() {
     }
   } catch (error) {
     console.error('Error loading current tabs:', error);
-    showNotification('Failed to load current tabs: ' + error.message);
+    showNotification('loadError', 'error', error.message);
   }
 }
 
@@ -61,19 +62,63 @@ async function loadSavedGroups() {
     }
   } catch (error) {
     console.error('Error loading saved groups:', error);
-    showNotification('Failed to load saved groups: ' + error.message);
+    showNotification('loadError', 'error', error.message);
   }
+}
+
+function updateUIText() {
+  // Update all elements with data-i18n attribute
+  document.querySelectorAll('[data-i18n]').forEach(element => {
+    const key = element.getAttribute('data-i18n');
+    element.textContent = t(key);
+  });
+
+  // Update all elements with data-i18n-title attribute
+  document.querySelectorAll('[data-i18n-title]').forEach(element => {
+    const key = element.getAttribute('data-i18n-title');
+    element.title = t(key);
+  });
+
+  // Update spans inside buttons (for button text)
+  document.querySelectorAll('button[data-i18n] span[data-i18n]').forEach(span => {
+    const key = span.getAttribute('data-i18n');
+    span.textContent = t(key);
+  });
+}
+
+function setupLanguageSelector() {
+  const languageSelect = document.getElementById('languageSelect');
+  if (!languageSelect) return;
+  
+  // Set initial value
+  languageSelect.value = getCurrentLanguage();
+  
+  languageSelect.addEventListener('change', async () => {
+    const newLang = languageSelect.value;
+    await chrome.storage.local.set({ language: newLang });
+    setLanguage(newLang);
+    updateUIText();
+    await loadAllGroups(); // Reload groups to update all dynamic text
+  });
 }
 
 // Initialize the extension
 document.addEventListener('DOMContentLoaded', async () => {
   try {
+    // Initialize language first
+    await initializeLanguage();
+    
+    // Setup language selector after language is initialized
+    setupLanguageSelector();
+    
+    // Update UI with the initialized language
+    updateUIText();
     await loadAllGroups();
     setupEventListeners(loadAllGroups, loadSavedGroups);
     setupMessageListener();
   } catch (error) {
     console.error('Error initializing:', error);
-    showNotification('Failed to initialize: ' + error.message);
+    showNotification('initError', 'error', error.message);
   }
 });
 
