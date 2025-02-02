@@ -1,15 +1,21 @@
 {
   "manifest_version": 3,
-  "name": "Save Tabs",
+  "name": "Local Tabs",
   "version": "1.0",
-  "description": "Save and organize browser tabs",
+  "description": "Save and organize your Chrome tabs",
   "permissions": [
     "tabs",
     "tabGroups",
-    "downloads",
     "storage",
-    "fileSystem"
+    "downloads"
   ],
+  "web_accessible_resources": [{
+    "resources": ["lib/jszip.min.js"],
+    "matches": ["<all_urls>"]
+  }],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  },
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
