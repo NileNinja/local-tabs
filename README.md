@@ -1,4 +1,4 @@
-# Save Tabs - Chrome Extension
+# Local Tabs - Chrome Extension
 
 A powerful Chrome extension that allows you to save and organize your browser tabs locally. Save your tab groups with favicons and timestamps, and easily restore them later.
 
@@ -19,7 +19,7 @@ A powerful Chrome extension that allows you to save and organize your browser ta
 1. Clone this repository or download the source code
 2. Open Chrome and navigate to `chrome://extensions/`
 3. Enable "Developer mode" in the top right corner
-4. Click "Load unpacked" and select the `save-tabs` directory
+4. Click "Load unpacked" and select the `local-tabs` directory
 
 ## Usage
 
@@ -60,7 +60,7 @@ A powerful Chrome extension that allows you to save and organize your browser ta
 ## File Structure
 
 ```
-save-tabs/
+local-tabs/
 ├── manifest.json           # Extension configuration (Manifest V3)
 ├── popup.html             # Main UI
 ├── background.js          # Service worker for background processes
