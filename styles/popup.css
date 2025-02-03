@@ -318,7 +318,8 @@ body {
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
-.settings-icon {
+.settings-icon,
+.import-export-icon {
   width: 18px;
   height: 18px;
   fill: currentColor;
