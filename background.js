@@ -107,8 +107,8 @@ async function handleFileSave(message) {
     const contentData = contentEncoder.encode(message.content);
     const dataUrl = `data:application/json;base64,${btoa(String.fromCharCode(...contentData))}`;
     
-    // Prepare and save the file
-    const filename = `${sanitizedName}_${timestamp}.json`;
+    // Prepare and save the file in local-tabs folder
+    const filename = `local-tabs/${sanitizedName}_${timestamp}.json`;
     const downloadId = await chrome.downloads.download({
       url: dataUrl,
       filename: filename,

@@ -46,20 +46,20 @@ async function loadSavedGroups() {
     
     const data = await chrome.storage.local.get('savedGroups');
     console.log('Got saved groups:', data);
-    if (data.savedGroups) {
-      const sortedGroups = Object.entries(data.savedGroups)
-        .sort(([, a], [, b]) => {
-          const timeA = new Date(a.savedAt || 0).getTime();
-          const timeB = new Date(b.savedAt || 0).getTime();
-          return timeB - timeA;
-        })
-        .reduce((acc, [key, value]) => {
-          acc[key] = value;
-          return acc;
-        }, {});
-      
-      displayGroups(sortedGroups, container, false);
-    }
+    const savedGroups = data.savedGroups || {};
+    
+    const sortedGroups = Object.entries(savedGroups)
+      .sort(([, a], [, b]) => {
+        const timeA = new Date(a.savedAt || 0).getTime();
+        const timeB = new Date(b.savedAt || 0).getTime();
+        return timeB - timeA;
+      })
+      .reduce((acc, [key, value]) => {
+        acc[key] = value;
+        return acc;
+      }, {});
+    
+    displayGroups(sortedGroups, container, false);
   } catch (error) {
     console.error('Error loading saved groups:', error);
     showNotification('loadError', 'error', error.message);
@@ -113,9 +113,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     // Update UI with the initialized language
     updateUIText();
-    await loadAllGroups();
+
+    // Initialize event handlers with the loader functions
     setupEventListeners(loadAllGroups, loadSavedGroups);
     setupMessageListener();
+
+    // Load groups after event handlers are set up
+    await loadAllGroups();
   } catch (error) {
     console.error('Error initializing:', error);
     showNotification('initError', 'error', error.message);

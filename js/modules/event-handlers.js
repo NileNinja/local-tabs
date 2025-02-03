@@ -13,20 +13,37 @@ export function initializeLoaders(allGroupsLoader, savedGroupsLoader) {
 const PLACEHOLDER_ICON = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIGZpbGw9IiNFNEU0RTQiLz48L3N2Zz4=';
 
 export function setupEventListeners(allGroupsLoader, savedGroupsLoader) {
-  // Initialize loaders
+  // Initialize loaders first
   initializeLoaders(allGroupsLoader, savedGroupsLoader);
-  document.getElementById('syncGroups').addEventListener('click', syncGroups);
-  document.getElementById('exportGroups').addEventListener('click', exportGroups);
-  document.getElementById('importGroups').addEventListener('click', () => {
-    document.getElementById('importFile').click();
-  });
-  document.getElementById('importFile').addEventListener('change', (event) => {
-    const file = event.target.files[0];
-    if (file) {
-      importGroups(file);
-      event.target.value = ''; // Reset the input
-    }
-  });
+  
+  // Get elements
+  const syncGroupsBtn = document.getElementById('syncGroups');
+  const exportGroupsBtn = document.getElementById('exportGroups');
+  const importGroupsBtn = document.getElementById('importGroups');
+  const importFileInput = document.getElementById('importFile');
+
+  // Add event listeners only if elements exist
+  if (syncGroupsBtn) {
+    syncGroupsBtn.addEventListener('click', syncGroups);
+  }
+  
+  if (exportGroupsBtn) {
+    exportGroupsBtn.addEventListener('click', exportGroups);
+  }
+  
+  if (importGroupsBtn && importFileInput) {
+    importGroupsBtn.addEventListener('click', () => {
+      importFileInput.click();
+    });
+    
+    importFileInput.addEventListener('change', (event) => {
+      const file = event.target.files[0];
+      if (file) {
+        importGroups(file);
+        event.target.value = ''; // Reset the input
+      }
+    });
+  }
   
   setupSettingsPanel();
 }
@@ -43,9 +60,21 @@ function setupSettingsPanel() {
   const settingsPanel = document.getElementById('settingsPanel');
   const settingsToggle = document.getElementById('settingsToggle');
 
-  settingsToggle.addEventListener('click', () => {
-    settingsPanel.classList.toggle('visible');
-  });
+  if (settingsPanel && settingsToggle) {
+    // Handle settings panel visibility
+    settingsToggle.addEventListener('click', () => {
+      settingsPanel.classList.toggle('visible');
+    });
+
+    // Close settings panel when clicking outside
+    document.addEventListener('click', (event) => {
+      if (!settingsPanel.contains(event.target) &&
+          !settingsToggle.contains(event.target) &&
+          settingsPanel.classList.contains('visible')) {
+        settingsPanel.classList.remove('visible');
+      }
+    });
+  }
 }
 
 async function syncGroups() {

@@ -43,23 +43,12 @@ export async function saveGroup(groupId, group) {
       }))
     };
     
-    const { folderLocation } = await chrome.storage.local.get('folderLocation');
-    if (!folderLocation) {
-      showNotification('Please set a sync folder location in settings first');
-      return;
-    }
-
-    if (!confirm(`This will save the group to: ${folderLocation}/tab_groups/\nContinue?`)) {
-      return;
-    }
-
     // Send message to background script
     const response = await new Promise((resolve) => {
       chrome.runtime.sendMessage({
         action: 'saveFile',
         groupName: sanitizedTitle,
-        content: JSON.stringify(groupData, null, 2),
-        folderLocation: folderLocation
+        content: JSON.stringify(groupData, null, 2)
       }, resolve);
     });
 

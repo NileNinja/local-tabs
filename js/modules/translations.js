@@ -3,13 +3,12 @@ const translations = {
     // Settings
     settings: 'Settings',
     language: 'Language',
-    saveLocation: 'Save Location',
-    chooseSaveLocation: 'Choose Save Location',
-    resetToDefault: 'Reset to Default',
-    usingDefault: 'Using default: Downloads/local-tabs',
-    saveLocationPath: 'Save location: Downloads/local-tabs',
-    saveLocationDescription: 'Choose where to save your files. The extension will try to save to your selected location first.',
-    saveLocationNote: 'Note: If saving to the selected location fails, files will be saved to Downloads/local-tabs as a fallback.',
+    syncFolder: 'Sync Folder',
+    enterFolderPath: 'Enter folder path',
+    save: 'Save',
+    folderSaved: 'Sync folder location saved successfully!',
+    folderError: 'Failed to save folder location',
+    folderRequired: 'Please enter a folder path',
 
     // Buttons
     syncGroups: 'Sync',
@@ -47,13 +46,12 @@ const translations = {
     // Settings
     settings: 'الإعدادات',
     language: 'اللغة',
-    saveLocation: 'موقع الحفظ',
-    chooseSaveLocation: 'اختر موقع الحفظ',
-    resetToDefault: 'إعادة تعيين للافتراضي',
-    usingDefault: 'الموقع الافتراضي: Downloads/local-tabs',
-    saveLocationPath: 'موقع الحفظ: Downloads/local-tabs',
-    saveLocationDescription: 'اختر مكان حفظ الملفات. سيحاول التطبيق الحفظ في الموقع المحدد أولاً.',
-    saveLocationNote: 'ملاحظة: إذا فشل الحفظ في الموقع المحدد، سيتم الحفظ في Downloads/local-tabs كخيار بديل.',
+    syncFolder: 'مجلد المزامنة',
+    enterFolderPath: 'أدخل مسار المجلد',
+    save: 'حفظ',
+    folderSaved: 'تم حفظ موقع مجلد المزامنة بنجاح!',
+    folderError: 'فشل حفظ موقع المجلد',
+    folderRequired: 'الرجاء إدخال مسار المجلد',
 
     // Buttons
     syncGroups: 'مزامنة',
@@ -116,24 +114,40 @@ export function t(key, ...args) {
 // Export initialization function to be called from popup.js
 export async function initializeLanguage() {
   try {
+    // Get stored language preference
     const { language } = await chrome.storage.local.get('language');
+    
+    // Determine which language to use
+    let selectedLang;
     if (language && translations[language]) {
-      currentLanguage = language;
-      setLanguage(language);
+      selectedLang = language;
     } else {
       // Try to use browser language, fallback to English
-      const browserLang = navigator.language.toLowerCase().startsWith('ar') ? 'ar' : 'en';
-      currentLanguage = browserLang;
-      setLanguage(browserLang);
+      selectedLang = navigator.language.toLowerCase().startsWith('ar') ? 'ar' : 'en';
       // Save the initial language setting
-      await chrome.storage.local.set({ language: browserLang });
+      try {
+        await chrome.storage.local.set({ language: selectedLang });
+      } catch (storageError) {
+        console.warn('Failed to save initial language setting:', storageError);
+        // Continue execution even if storage fails
+      }
     }
+
+    // Set the language only once
+    currentLanguage = selectedLang;
+    const success = setLanguage(selectedLang);
+    if (!success) {
+      throw new Error(`Failed to set language: ${selectedLang}`);
+    }
+
     return currentLanguage;
   } catch (error) {
     console.error('Error initializing language:', error);
-    // Fallback to English on error
-    currentLanguage = 'en';
-    setLanguage('en');
+    // Fallback to English on error, but only set if not already English
+    if (currentLanguage !== 'en') {
+      currentLanguage = 'en';
+      setLanguage('en');
+    }
     return 'en';
   }
 }
